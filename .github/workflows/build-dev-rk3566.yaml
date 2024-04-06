@@ -6,8 +6,7 @@
 
 name: build-dev-rk3566
 on:
-  repository_dispatch:
-    types: [release-dev-rk3566]
+  workflow_dispatch:
 
 concurrency:
   group: dev
@@ -18,21 +17,11 @@ jobs:
     runs-on: ubuntu-22.04
     container: justenoughlinuxos/jelos-build:latest
     steps:
-      - uses: hmarr/debug-action@v2
-        name: debug
-      - name: get current branch as it may not be 'default branch;
-        id: branch
-        run: |
-            branch_arg="${{ github.event.client_payload.branch }}"
-            if [[ -z "$branch_arg" ]]; then
-              branch_arg="$GITHUB_REF_NAME"
-            fi
-            echo "branch=$branch_arg" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v3
         name: checkout
         with:
           clean: false
-          ref: "${{ steps.branch.outputs.branch }}"
+          ref: "dev-rk3566"
       - name: Get date for artifacts
         id: date
         run: echo "date=$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
@@ -42,14 +31,14 @@ jobs:
       - name: Get dev version
         id: version
         run: |
-           set -e
-           echo "full name: ${{ github.event.repository.full_name }}"
-           if [[ "${{ github.event.client_payload.release_tag }}" != "" ]]; then
-               echo "version=${{ github.event.client_payload.release_tag }}" >> $GITHUB_OUTPUT
-           else
-               echo "version=${{ steps.date.outputs.date }}-${{ steps.sha.outputs.sha }}" >> $GITHUB_OUTPUT
-           fi
-      - name: Build World
+          set -e
+          echo "full name: ${{ github.event.repository.full_name }}"
+          if [[ "${{ github.event.client_payload.release_tag }}" != "" ]]; then
+              echo "version=${{ github.event.client_payload.release_tag }}" >> $GITHUB_OUTPUT
+          else
+              echo "version=${{ steps.date.outputs.date }}-${{ steps.sha.outputs.sha }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Build RK3566
         run: |
-            set -e
-            CUSTOM_VERSION="${{ steps.version.outputs.version }}" DOCKER_WORK_DIR="/work" DOCKER_EXTRA_OPTS="-v /buildroot:/buildroot" make docker-world >/tmp/build.log 2>&1
+          set -e
+          CUSTOM_VERSION="${{ steps.version.outputs.version }}" DOCKER_WORK_DIR="/work" DOCKER_EXTRA_OPTS="-v /buildroot:/buildroot" make docker-rk3566 >/tmp/build.log 2>&1
