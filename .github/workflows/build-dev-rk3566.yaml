@@ -19,6 +19,8 @@ jobs:
       image: justenoughlinuxos/jelos-build:latest
       env:
         DOCKER_WORK_DIR: "/work"
+      volumes:
+        - my_docker_volume:/work
     steps:
       - uses: actions/checkout@v3
         name: checkout
@@ -46,4 +48,4 @@ jobs:
             set -e
             pwd
             ls -alh
-            CUSTOM_VERSION="${{ steps.version.outputs.version }}" DOCKER_WORK_DIR="/work" DOCKER_EXTRA_OPTS="-v /buildroot:/buildroot" make RK3566 >/tmp/build.log 2>&1
+            CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 > ./build.log 2>&1
