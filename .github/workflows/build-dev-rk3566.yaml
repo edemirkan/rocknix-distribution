@@ -40,6 +40,7 @@ jobs:
           options: -v ${{ github.workspace }}:/work --user ${{ steps.version.outputs.id }}:${{ steps.version.outputs.gid }}
           run: |
               set -e
+              echo "Starting build..."
               CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 >build.log 2>&1
       - uses: actions/upload-artifact@v4
         name: Upload artifact
