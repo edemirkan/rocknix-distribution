@@ -40,7 +40,7 @@ jobs:
         name: Build RK3566
         with:
           registry: docker.io
-          image: justenoughlinuxos/jelos-build
+          image:  docker.io/aveferrum/rocknix-build
           options: -v ${{ github.workspace }}:/work --user ${{ steps.version.outputs.id }}:${{ steps.version.outputs.gid }}
           run: |
               set -e
