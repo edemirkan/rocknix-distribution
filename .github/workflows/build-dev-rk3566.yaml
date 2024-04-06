@@ -38,7 +38,7 @@ jobs:
         name: Build RK3566
         with:
           registry: docker.io
-          image: justenoughlinuxos/jelos-build  latest
+          image: justenoughlinuxos/jelos-build
           options: -v ${{ github.workspace }}:/work
           run: |
               set -e
