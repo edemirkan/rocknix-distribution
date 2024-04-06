@@ -4,7 +4,7 @@
 
 ### Based on work by @pkegg
 
-name: build-dev
+name: build-dev-rk3566
 on:
   repository_dispatch:
     types: [release-dev-rk3566]
