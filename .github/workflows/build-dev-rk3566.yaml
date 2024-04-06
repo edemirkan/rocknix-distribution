@@ -34,12 +34,14 @@ jobs:
            else
                echo "version=${{ steps.date.outputs.date }}-${{ steps.sha.outputs.sha }}" >> $GITHUB_OUTPUT
            fi
+           echo "id=$(id -u)" >> $GITHUB_OUTPUT
+           echo "gid=$(id -g)" >> $GITHUB_OUTPUT
       - uses: addnab/docker-run-action@v3
         name: Build RK3566
         with:
           registry: docker.io
           image: justenoughlinuxos/jelos-build
-          options: -v ${{ github.workspace }}:/work
+          options: -v ${{ github.workspace }}:/work --user ${{ steps.version.outputs.id }}:${{ steps.version.outputs.gid }}
           run: |
               set -e
               pwd
