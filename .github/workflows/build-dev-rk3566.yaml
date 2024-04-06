@@ -12,15 +12,15 @@ jobs:
     timeout-minutes: 1440
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
-        name: Checkout
-      - name: Get date for artifacts
+      - name: Get Code
+        uses: actions/checkout@v3
+      - name: Get Date for Artifacts
         id: date
         run: echo "date=$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
       - name: Get short SHA for artifacts
         id: sha
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Get version
+      - name: Get Version
         id: version
         run: |
            set -e
@@ -32,8 +32,17 @@ jobs:
            fi
            echo "id=$(id -u)" >> $GITHUB_OUTPUT
            echo "gid=$(id -g)" >> $GITHUB_OUTPUT
-      - uses: addnab/docker-run-action@v3
-        name: Build RK3566
+      - name: Cache 
+        uses: actions/cache@v3
+        with:
+          path: |
+            .ccache-aarch64
+            .ccache-arm
+            sources
+          key: ccache-${{ hashFiles('packages/**/package.mk') }}
+      - name: Build RK3566
+        id: build
+        uses: addnab/docker-run-action@v3
         with:
           registry: docker.io
           image:  docker.io/aveferrum/rocknix-build
@@ -41,11 +50,16 @@ jobs:
           run: |
               set -e
               echo "Starting build..."
-              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 >build.log 2>&1
-      - uses: actions/upload-artifact@v4
-        name: Upload artifact
+              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 2>&1 | tee >(tail -n 100 > snip-build.log)
+      - name: Upload Build Logs
+        if: failure() && steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: snip-build.log     
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
         with:
           name: rk3566-image
-          path: | 
-               release/*
-               build.log
+          path: release/*
+
