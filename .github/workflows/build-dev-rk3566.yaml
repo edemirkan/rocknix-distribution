@@ -40,4 +40,4 @@ jobs:
       - name: Build RK3566
         run: |
           set -e
-          CUSTOM_VERSION="${{ steps.version.outputs.version }}" make rk3566 >/tmp/build.log 2>&1
+          CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 >/tmp/build.log 2>&1
