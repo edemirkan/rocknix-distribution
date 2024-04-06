@@ -14,7 +14,8 @@ concurrency:
 jobs:
   build:
     timeout-minutes: 1440
-    runs-on: dev
+    runs-on: ubuntu-22.04
+    container: justenoughlinuxos/jelos-build:latest
     steps:
       - uses: hmarr/debug-action@v2
         name: debug
