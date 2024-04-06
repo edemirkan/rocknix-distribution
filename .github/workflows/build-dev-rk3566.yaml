@@ -50,16 +50,16 @@ jobs:
           run: |
               set -e
               echo "Starting build..."
-              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 2>&1 | tee >(tail -n 100 > snip-build.log)
+              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 >build.log 2>&1    
       - name: Upload Build Logs
         if: failure() && steps.build.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: snip-build.log     
+          path: build.log     
       - name: Upload Artifact
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: rk3566-image
           path: release/*
-
