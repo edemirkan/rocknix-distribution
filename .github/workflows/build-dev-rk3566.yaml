@@ -7,17 +7,13 @@
 name: build-dev-rk3566
 on:
   workflow_dispatch:
-
 jobs:
   build:
     timeout-minutes: 1440
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-        name: checkout
-        with:
-          clean: false
-          ref: "dev-rk3566"
+        name: Checkout
       - name: Get date for artifacts
         id: date
         run: echo "date=$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
@@ -44,6 +40,10 @@ jobs:
           options: -v ${{ github.workspace }}:/work --user ${{ steps.version.outputs.id }}:${{ steps.version.outputs.gid }}
           run: |
               set -e
-              pwd
-              ls -alh
-              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566
+              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 >build.log 2>&1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rk3566-image
+          path: | 
+               release/*
+               build.log
