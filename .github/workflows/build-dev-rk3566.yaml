@@ -20,7 +20,7 @@ jobs:
       - name: Get short SHA for artifacts
         id: sha
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Get dev version
+      - name: Get version
         id: version
         run: |
            set -e
@@ -42,6 +42,7 @@ jobs:
               set -e
               CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 >build.log 2>&1
       - uses: actions/upload-artifact@v4
+        name: Upload artifact
         with:
           name: rk3566-image
           path: | 
