@@ -8,19 +8,10 @@ name: build-dev-rk3566
 on:
   workflow_dispatch:
 
-concurrency:
-  group: dev
-
 jobs:
   build:
     timeout-minutes: 1440
     runs-on: ubuntu-22.04
-    container: 
-      image: justenoughlinuxos/jelos-build:latest
-      env:
-        DOCKER_WORK_DIR: "/work"
-      volumes:
-        - my_docker_volume:/work
     steps:
       - uses: actions/checkout@v3
         name: checkout
@@ -43,9 +34,14 @@ jobs:
            else
                echo "version=${{ steps.date.outputs.date }}-${{ steps.sha.outputs.sha }}" >> $GITHUB_OUTPUT
            fi
-      - name: Build RK3566
-        run: |
-            set -e
-            pwd
-            ls -alh
-            CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 > ./build.log 2>&1
+      - uses: addnab/docker-run-action@v3
+        name: Build RK3566
+        with:
+          registry: docker.io
+          image: justenoughlinuxos/jelos-build  latest
+          options: -v ${{ github.workspace }}:/work
+          run: |
+              set -e
+              pwd
+              ls -alh
+              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 > ./build.log 2>&1
