@@ -44,4 +44,4 @@ jobs:
               set -e
               pwd
               ls -alh
-              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566 > ./build.log 2>&1
+              CUSTOM_VERSION="${{ steps.version.outputs.version }}" make RK3566
