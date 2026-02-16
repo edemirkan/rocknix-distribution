@@ -2,7 +2,7 @@
 # Copyright (C) 2024-present ROCKNIX (https://github.com/ROCKNIX)
 
 PKG_NAME="emulationstation"
-PKG_VERSION="296aa02c6526ac42ebedb9ae9cab0062c3082b5f"
+PKG_VERSION="14e88d812efbdc1227868af4e2e23c9f63dbb89d"
 PKG_GIT_CLONE_BRANCH="feat/volume-step"
 PKG_LICENSE="GPL"
 PKG_SITE="https://github.com/edemirkan/rocknix-emulationstation-next"
