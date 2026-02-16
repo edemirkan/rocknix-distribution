@@ -9,9 +9,10 @@
 . /etc/profile.d/001-functions
 
 VOLUME=$(get_setting "audio.volume")
+STEP=$(get_setting "audio.volume.step")
 MAX_VOLUME=100
 MIN_VOLUME=0
-STEP=5
+
 
 case ${1} in
   "+"|"up")
