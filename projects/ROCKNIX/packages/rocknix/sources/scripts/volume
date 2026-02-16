@@ -11,14 +11,29 @@
 VOLUME=$(get_setting "audio.volume")
 MAX_VOLUME=100
 MIN_VOLUME=0
-STEP=5
+DEFAULT_STEP=5
+STEP=${DEFAULT_STEP}
+LOW_VOLUME_THRESHOLD=10
+LOW_VOLUME_STEP=1
+
+if (( ${VOLUME} >= ${MIN_VOLUME} && ${VOLUME} <= ${LOW_VOLUME_THRESHOLD} )); then
+  STEP=${LOW_VOLUME_STEP}
+fi
 
 case ${1} in
   "+"|"up")
-    VOLUME=$(( ${VOLUME} + ${STEP} ))
+    if (( ${VOLUME} <= ${LOW_VOLUME_THRESHOLD} && ${VOLUME} + ${STEP} > ${LOW_VOLUME_THRESHOLD} )); then
+      VOLUME=$(( ${LOW_VOLUME_THRESHOLD} + ${DEFAULT_STEP} ))
+    else
+      VOLUME=$(( ${VOLUME} + ${STEP} ))
+    fi
   ;;
   "-"|"down")
-    VOLUME=$(( ${VOLUME} - ${STEP} ))
+    if (( ${VOLUME} > ${LOW_VOLUME_THRESHOLD} && ${VOLUME} - ${STEP} < ${LOW_VOLUME_THRESHOLD} )); then
+      VOLUME=${LOW_VOLUME_THRESHOLD}
+    else
+      VOLUME=$(( ${VOLUME} - ${STEP} ))
+    fi
   ;;
   "restore")
     true
