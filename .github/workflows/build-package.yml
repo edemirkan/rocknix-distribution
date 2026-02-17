@@ -18,6 +18,7 @@ on:
 
 jobs:
   build-aarch64-package:
+    name: Build ${{ inputs.PACKAGE }}
     runs-on: ubuntu-24.04
     permissions:
       actions: write
@@ -54,10 +55,62 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Retrieve ccache
+      - name: Retrieve ccache (toolchain)
+        run: |
+          URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache/ccache-aarch64-${{ inputs.DEVICE }}-toolchain.tar"
+          curl -L --fail --silent --show-error "$URL" | tar -xvf - || echo "Cache archive not found, skipping."     
+
+      - name: Retrieve ccache (emu-libretro)
         run: |
           URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache/ccache-aarch64-${{ inputs.DEVICE }}-emu-libretro.tar"
+          curl -L --fail --silent --show-error "$URL" | tar -xvf - || echo "Cache archive not found, skipping."
+      
+      - name: Retrieve ccache (arm)
+        run: |
+          URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache/ccache-arm-${{ inputs.DEVICE }}.tar"
+          curl -L --fail --silent --show-error "$URL" | tar -xvf - || echo "Cache archive not found, skipping." 
+
+      - name: Retrieve ccache (aarch64)
+        run: |
+          URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache/ccache-aarch64-${{ inputs.DEVICE }}.tar"
+          curl -L --fail --silent --show-error "$URL" | tar -xvf - || echo "Cache archive not found, skipping." 
+
+      - name: Retrieve ccache (emu-standalone)
+        run: |
+          BASE="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache"
+          PREFIX="ccache-aarch64-${{ inputs.DEVICE }}-emu-standalone.tar.part-"
+          found_any=0
+          for suffix in $(printf "%s\n" {a..z}{a..z}); do
+            FILE="${PREFIX}${suffix}"
+            URL="${BASE}/${FILE}"
+          
+            echo "Trying $URL"
+            if curl -L --fail --silent --show-error -o "$FILE" "$URL"; then
+              echo "Downloaded $FILE"
+              found_any=1
+            else
+              echo "No more parts found at $URL"
+              break
+            fi
+          done
+          if [ "$found_any" -eq 0 ]; then
+            echo "No cache found, skipping."
+            exit 0
+          fi
+          cat ${PREFIX}* > ccache.tar
+          tar -xvf ccache.tar || { echo "Extract failed"; exit 0; }
+          rm -f ${PREFIX}* ccache.tar
+
+      - name: Retrieve ccache (qt6)
+        if: ${{ inputs.DEVICE == 'RK3399' || inputs.DEVICE == 'RK3566' || inputs.DEVICE == 'RK3588' || inputs.DEVICE == 'S922X' || inputs.DEVICE == 'SM8250' || inputs.DEVICE == 'SM8550' }}
+        run: |
+          URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache/ccache-aarch64-${{ inputs.DEVICE }}-qt6.tar"
           curl -L --fail --silent --show-error "$URL" | tar -xvf - || echo "Cache archive not found, skipping."  
+
+      - name: Retrieve ccache (mame-lr)
+        run: |
+          URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache/ccache-aarch64-${{ inputs.DEVICE }}-mame.tar"
+          curl -L --fail --silent --show-error "$URL" | tar -xvf - || echo "Cache archive not found, skipping." 
 
       - name: Build
         uses: corrupt952/actions-retry-command@v1.0.7
@@ -81,43 +134,36 @@ jobs:
             output.log
             ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.threads/logs/
 
-      # - name: Clean ccache
-      #   run: |
-      #     export CCACHE_DIR=./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.ccache
-      #     ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -s -v
-      #     ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -M 2G
-      #     ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -c
-      #     ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -s -v
-      #     ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -z
+      - name: Clean ccache
+        run: |
+          export CCACHE_DIR=./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.ccache
+          ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -s -v
+          ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -M 2G
+          ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -c
+          ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -s -v
+          ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain/bin/ccache -z
 
-      # - name: Tar ccache
-      #   run: |
-      #     tar -cf ccache-aarch64-${{ inputs.DEVICE }}-emu-libretro.tar ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.ccache 
+      - name: Tar ccache
+        run: |
+          tar --remove-files -cf ccache-aarch64-${{ inputs.DEVICE }}.tar ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.ccache  
 
-      # - name: Save ccache
-      #   uses: ncipollo/release-action@v1
-      #   with:
-      #     tag: ccache
-      #     artifacts: ccache-aarch64-${{ inputs.DEVICE }}-emu-libretro.tar
-      #     allowUpdates: true
-      #     makeLatest: true
-      #     prerelease: true
-      #     body: ccache
-      #     token: ${{ secrets.GH_PAT }}
-      #     repo: ${{ vars.CACHE_REPO || 'distribution-cache' }}
-      #   continue-on-error: true
+      - name: Print space
+        run: df -h
 
-      # - name: Print space
-      #   run: df -h
+      - name: Compress directory
+        run: |
+          sudo tar --remove-files \
+          -cf build.build.aarch64.tar ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/build
+          sudo tar --remove-files \
+          -cf build.aarch64.tar ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/
 
-      # - name: Compress directory
-      #   run: | 
-      #     sudo tar --remove-files -cf - \
-      #     ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/install_* \
-      #     ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.stamps | split -b 2G -  build.emu-libretro.tar.part
-
-      # - uses: actions/upload-artifact@v4
-      #   with:
-      #     name: emu-libretro (${{ inputs.DEVICE }})
-      #     path: build.emu-libretro.tar.part*
-      #     if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aarch64 (${{ inputs.DEVICE }})
+          path: build.aarch64.tar
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aarch64 build (${{ inputs.DEVICE }})
+          path: build.build.aarch64.tar
+          if-no-files-found: error
