@@ -1,0 +1,70 @@
+name: Add AI Usage Label
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-ai-usage:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Create ai-generated label with red color
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'ai-generated',
+                color: 'd73a49',
+                description: 'This PR was generated or assisted by AI tools'
+              })
+            } catch (error) {
+              // Label already exists, ignore error
+              console.log('Label already exists')
+            }
+
+      - name: Check for AI usage in PR description
+        id: check_ai
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          
+          # Check if PR description contains YES or PARTIALLY for AI usage
+          if echo "$PR_BODY" | grep -iE "(YES|PARTIALLY)" > /dev/null; then
+            echo "ai_used=true" >> $GITHUB_OUTPUT
+          else
+            echo "ai_used=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Add ai-generated label
+        if: steps.check_ai.outputs.ai_used == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['ai-generated']
+            })
+
+      - name: Remove ai-generated label if not applicable
+        if: steps.check_ai.outputs.ai_used == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              github.rest.issues.removeLabel({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'ai-generated'
+              })
+            } catch (error) {
+              // Label doesn't exist, ignore error
+              console.log('Label not found, skipping removal')
+            }
