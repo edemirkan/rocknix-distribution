@@ -6,7 +6,7 @@ on:
 
 jobs:
   check-ai-usage:
-    name: Check for AI Usage Declaration and Label PR
+    name: Check AI Usage
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
