@@ -12,6 +12,7 @@ jobs:
       contents: read
     steps:
       - name: Create ai-generated label with red color
+        id: create_label
         uses: actions/github-script@v7
         with:
           script: |
@@ -24,8 +25,15 @@ jobs:
                 description: 'This PR was generated or assisted by AI tools'
               })
             } catch (error) {
-              // Label already exists, ignore error
-              console.log('Label already exists')
+              // GitHub returns a 422 with code "already_exists" when the label exists.
+              // Detect that case explicitly, otherwise re‑throw.
+              if (error.status === 422 &&
+                  error.message &&
+                  error.message.includes('already_exists')) {
+                console.log('Label already exists, continuing');
+              } else {
+                throw error;
+              }
             }
 
       - name: Check for AI usage in PR description
