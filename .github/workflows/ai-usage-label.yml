@@ -6,14 +6,15 @@ on:
 
 jobs:
   check-ai-usage:
+    name: Check for AI Usage Declaration and Label PR
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
       contents: read
     steps:
-      - name: Create ai-generated label with red color
-        id: create_label
-        uses: actions/github-script@v7
+      - name: Check/Create ai-generated label with red color
+        id: check_create_label
+        uses: actions/github-script@v8
         with:
           script: |
             try {
@@ -51,7 +52,7 @@ jobs:
 
       - name: Add ai-generated label
         if: steps.check_ai.outputs.ai_used == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             github.rest.issues.addLabels({
@@ -63,7 +64,7 @@ jobs:
 
       - name: Remove ai-generated label if not applicable
         if: steps.check_ai.outputs.ai_used == 'false'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             try {
