@@ -31,8 +31,10 @@ jobs:
                   error.message &&
                   error.message.includes('already_exists')) {
                   console.log('Label already exists, continuing');
+                  return true;
               } else {
                 console.log('Unhandled error:', error);
+                throw error;
               }
             }
 
