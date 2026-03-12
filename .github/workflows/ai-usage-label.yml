@@ -17,7 +17,7 @@ jobs:
         with:
           script: |
             try {
-              github.rest.issues.createLabel({
+              await github.rest.issues.createLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 name: 'ai-generated',
@@ -25,17 +25,17 @@ jobs:
                 description: 'This PR was generated or assisted by AI tools'
               })
             } catch (error) {
-              // GitHub returns a 422 with code "already_exists" when the label exists.
-              // Detect that case explicitly, otherwise re‑throw.
-              if (error.status === 422 &&
-                  error.message &&
-                  error.message.includes('already_exists')) {
-                  console.log('Label already exists, continuing');
-                  return true;
-              } else {
-                console.log('Unhandled error:', error);
-                throw error;
+              const alreadyExists =
+                error.status === 422 &&
+                error.response?.data?.errors?.some(e => e.code === 'already_exists')
+
+              if (alreadyExists) {
+                console.log('Label already exists, continuing')
+                return true
               }
+
+              console.log('Unhandled error:', error)
+              throw error
             }
 
       - name: Check for AI usage in PR description
