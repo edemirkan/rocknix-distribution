@@ -33,8 +33,7 @@ jobs:
         run: |
           PR_BODY="${{ github.event.pull_request.body }}"
           
-          # Check if PR description contains YES or PARTIALLY for AI usage
-          if echo "$PR_BODY" | grep -iE "(YES|PARTIALLY)" > /dev/null; then
+          if echo "$PR_BODY" | grep -P "(?s)Did you use AI tools to help write this code\?.*(YES|PARTIALLY)" > /dev/null; then
             echo "ai_used=true" >> $GITHUB_OUTPUT
           else
             echo "ai_used=false" >> $GITHUB_OUTPUT
