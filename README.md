@@ -61,3 +61,5 @@ All other software is provided under each component's respective license.  These
 ## Credits
 
 Like any Linux distribution, this project is not the work of one person.  It is the work of many persons all over the world who have developed the open source bits without which this project could not exist.  Special thanks to CoreELEC, LibreELEC, JELOS, and to developers and contributors across the open source community.
+
+Sample Text
