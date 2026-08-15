@@ -60,9 +60,9 @@ jobs:
           URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/toolchain/${BASE}.tar.zst"
           SUMURL="${URL}.sha256"
 
-          if curl -L --fail --silent -o tree.tar.zst "$URL" && curl -L --fail --silent -o tree.tar.zst.sha256 "$SUMURL"; then
-            if sha256sum -c tree.tar.zst.sha256; then
-              tar --zstd -xf tree.tar.zst
+          if curl -L --fail --silent -o "${BASE}.tar.zst" "$URL" && curl -L --fail --silent -o "${BASE}.tar.zst.sha256" "$SUMURL"; then
+            if sha256sum -c "${BASE}.tar.zst.sha256"; then
+              tar --zstd -xf "${BASE}.tar.zst"
               echo "hit=true" >> "$GITHUB_OUTPUT"
               echo "Restored full toolchain tree for hash $HASH — skipping build"
             else
