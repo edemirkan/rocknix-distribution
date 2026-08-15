@@ -35,6 +35,7 @@ jobs:
       CCACHE_COMPRESS: 1
       CCACHE_COMPRESSLEVEL: 6
       CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+      PACKAGE_LIST: "toolchain alsa-lib llvm:host"
     outputs:
       cache-hit: ${{ steps.restore-toolchain.outputs.hit }}
     steps:
@@ -42,13 +43,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compute toolchain hash
+      # Compute a hash of all the package.mk, *.patch, and *.conf files in the toolchain dependency tree. 
+      # This is used to determine whether we can restore a previous build from cache.
+      - name: Compute toolchain dependency hash
         id: hash
         run: |
-          HASH=$(find packages/toolchain packages/devel packages/audio/alsa-lib packages/lang/llvm \
-            -type f \( -name 'package.mk' -o -name '*.patch' -o -name '*.conf' \) 2>/dev/null \
-            | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+          export PROJECT DEVICE ARCH=aarch64
+          DIRS=$(bash tools/list_deps.sh ${PACKAGE_LIST})
+
+          HASH=$(for d in $DIRS; do
+            find "$d" -type f \( -name 'package.mk' -o -name '*.patch' -o -name '*.conf' \)
+          done | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+
           echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "Resolved $(echo "$DIRS" | wc -l) package dirs into hash $HASH"
 
       # Try to restore the whole toolchain/build tree from a previous run first.
       # On a hit, Build and everything that only makes sense post-build is skipped.
@@ -94,7 +102,7 @@ jobs:
             ./scripts/get_env > .env
             set -e
             { docker run --init --env-file .env --rm --user $(id -u):$(id -g) -v ${PWD}:${PWD} -w ${PWD} "ghcr.io/${{ inputs.OWNER_LC }}/rocknix-build:latest" \
-              bash -c "./scripts/build_mt toolchain alsa-lib llvm:host"; echo $? > docker_exit_code; } | tee output.log | grep -E  --color=never --line-buffered "^GET|^UNPACK|^BUILD|^INSTALL" || true
+              bash -c "./scripts/build_mt ${PACKAGE_LIST}"; echo $? > docker_exit_code; } | tee output.log | grep -E  --color=never --line-buffered "^GET|^UNPACK|^BUILD|^INSTALL" || true
             exit_code=$(<docker_exit_code)
             exit $exit_code
           max_attempts: 6
