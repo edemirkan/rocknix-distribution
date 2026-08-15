@@ -38,11 +38,6 @@ jobs:
     outputs:
       cache-hit: ${{ steps.restore-toolchain.outputs.hit }}
     steps:
-      - name: Maximize build space
-        uses: justinthelaw/maximize-github-runner-space@v0.9.0
-        with:
-          skip-components: docker-engine
-
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -50,7 +45,7 @@ jobs:
       - name: Compute toolchain hash
         id: hash
         run: |
-          HASH=$(find packages/toolchain packages/devel packages/multimedia/alsa-lib packages/graphics/llvm \
+          HASH=$(find packages/toolchain packages/devel packages/audio/alsa-lib packages/lang/llvm \
             -type f \( -name 'package.mk' -o -name '*.patch' -o -name '*.conf' \) 2>/dev/null \
             | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
           echo "hash=$HASH" >> "$GITHUB_OUTPUT"
@@ -78,6 +73,12 @@ jobs:
             echo "No exact-match toolchain tree for $HASH"
             echo "hit=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Maximize build space
+        if: steps.restore-toolchain.outputs.hit != 'true'
+        uses: justinthelaw/maximize-github-runner-space@v0.9.0
+        with:
+          skip-components: docker-engine
 
       - name: Retrieve ccache
         if: steps.restore-toolchain.outputs.hit != 'true'
