@@ -4,15 +4,16 @@ set -euo pipefail
 
 declare -A SEEN
 QUEUE=()
-for a in "$@"; do QUEUE+=("${a}|walk"); done   # trigger packages: full walk
-PKG_DIRS=()
+for a in "$@"; do QUEUE+=("${a}|walk"); done
+WALK_DIRS=()
+LEAF_DIRS=()
 WATCH_PATHS=()
 
 while [ ${#QUEUE[@]} -gt 0 ]; do
   entry="${QUEUE[0]}"
   QUEUE=("${QUEUE[@]:1}")
   pkg="${entry%|*}"
-  mode="${entry#*|}"   # "walk" = recurse into its deps, "leaf" = content-only
+  mode="${entry#*|}"
 
   base="${pkg%%:*}"
   stage="target"
@@ -29,15 +30,19 @@ while [ ${#QUEUE[@]} -gt 0 ]; do
   info=$(tools/pkginfo "${base}" 2>/dev/null) || continue
 
   dir=$(echo "$info" | grep '^PKG_DIR=' | cut -d'"' -f2)
-  [ -n "$dir" ] && PKG_DIRS+=("$dir")
+  if [ -n "$dir" ]; then
+    if [ "$mode" = "leaf" ]; then
+      LEAF_DIRS+=("$dir")
+    else
+      WALK_DIRS+=("$dir")
+    fi
+  fi
 
   need_unpack=$(echo "$info" | grep '^PKG_NEED_UNPACK=' | cut -d'"' -f2)
   for p in $need_unpack; do
     [ -d "$p" ] && WATCH_PATHS+=("$p")
   done
 
-  # leaf entries (reached via PKG_DEPENDS_UNPACK) contribute their own
-  # content but their dependency chain never actually builds — stop here.
   [ "$mode" = "leaf" ] && continue
 
   case "$stage" in
@@ -58,12 +63,26 @@ while [ ${#QUEUE[@]} -gt 0 ]; do
   done
 done
 
-UNIQUE_PKG_DIRS=$(printf '%s\n' "${PKG_DIRS[@]}" | sort -u)
-UNIQUE_WATCH_PATHS=$(printf '%s\n' "${WATCH_PATHS[@]}" | sort -u)
+WALK_NAMES=$(printf '%s\n' "${WALK_DIRS[@]}" | xargs -n1 basename | sort -u)
+LEAF_NAMES=$(printf '%s\n' "${LEAF_DIRS[@]}" | xargs -n1 basename | sort -u)
+ALL_NAMES=$(printf '%s\n%s\n' "$WALK_NAMES" "$LEAF_NAMES" | sort -u)
+WATCH_UNIQUE=$(printf '%s\n' "${WATCH_PATHS[@]}" | sort -u)
 
-echo "Resolved package count: $(echo "$UNIQUE_PKG_DIRS" | grep -c .)" >&2
-echo "Watch-path count: $(echo "$UNIQUE_WATCH_PATHS" | grep -c .)" >&2
+{
+  echo "# Built packages (own BUILD step): $(echo "$WALK_NAMES" | grep -c .)"
+  echo "$WALK_NAMES"
+  echo
+  echo "# Unpack-only packages (PKG_DEPENDS_UNPACK, no own build step): $(echo "$LEAF_NAMES" | grep -c .)"
+  echo "$LEAF_NAMES"
+  echo
+  echo "# Total resolved packages: $(echo "$ALL_NAMES" | grep -c .)"
+  echo
+  echo "# Watch paths (PKG_NEED_UNPACK, project/device overlays etc.): $(echo "$WATCH_UNIQUE" | grep -c .)"
+  echo "$WATCH_UNIQUE"
+} >&2
 
-printf '%s\n' "$UNIQUE_PKG_DIRS"
+# stdout stays script-consumable: dirs to hash for package.mk/patch content,
+# then a marker, then watch-paths to hash as raw file content
+printf '%s\n' "${WALK_DIRS[@]}" "${LEAF_DIRS[@]}" | sort -u
 echo '---WATCH---'
-printf '%s\n' "$UNIQUE_WATCH_PATHS"
+printf '%s\n' "$WATCH_UNIQUE"
