@@ -3,13 +3,16 @@ set -euo pipefail
 # usage: PROJECT=... DEVICE=... ARCH=... tools/list_deps.sh toolchain alsa-lib llvm:host
 
 declare -A SEEN
-QUEUE=("$@")
+QUEUE=()
+for a in "$@"; do QUEUE+=("${a}|walk"); done   # trigger packages: full walk
 PKG_DIRS=()
 WATCH_PATHS=()
 
 while [ ${#QUEUE[@]} -gt 0 ]; do
-  pkg="${QUEUE[0]}"
+  entry="${QUEUE[0]}"
   QUEUE=("${QUEUE[@]:1}")
+  pkg="${entry%|*}"
+  mode="${entry#*|}"   # "walk" = recurse into its deps, "leaf" = content-only
 
   base="${pkg%%:*}"
   stage="target"
@@ -28,13 +31,14 @@ while [ ${#QUEUE[@]} -gt 0 ]; do
   dir=$(echo "$info" | grep '^PKG_DIR=' | cut -d'"' -f2)
   [ -n "$dir" ] && PKG_DIRS+=("$dir")
 
-  # PKG_NEED_UNPACK is already-resolved paths (project/device overlays, stamp
-  # deps) — not package names, and not necessarily package.mk-shaped. Watch
-  # them as raw content, don't try to walk them as dependencies.
   need_unpack=$(echo "$info" | grep '^PKG_NEED_UNPACK=' | cut -d'"' -f2)
   for p in $need_unpack; do
     [ -d "$p" ] && WATCH_PATHS+=("$p")
   done
+
+  # leaf entries (reached via PKG_DEPENDS_UNPACK) contribute their own
+  # content but their dependency chain never actually builds — stop here.
+  [ "$mode" = "leaf" ] && continue
 
   case "$stage" in
     host)      deps=$(echo "$info" | grep '^PKG_DEPENDS_HOST=' | cut -d'"' -f2) ;;
@@ -44,9 +48,13 @@ while [ ${#QUEUE[@]} -gt 0 ]; do
   esac
   unpack_deps=$(echo "$info" | grep '^PKG_DEPENDS_UNPACK=' | cut -d'"' -f2)
 
-  for d in $deps $unpack_deps; do
+  for d in $deps; do
     [ "$d" = "$base" ] && continue
-    QUEUE+=("$d")
+    QUEUE+=("${d}|walk")
+  done
+  for d in $unpack_deps; do
+    [ "$d" = "$base" ] && continue
+    QUEUE+=("${d}|leaf")
   done
 done
 
