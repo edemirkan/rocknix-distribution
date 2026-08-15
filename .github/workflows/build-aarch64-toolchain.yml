@@ -49,14 +49,20 @@ jobs:
         id: hash
         run: |
           export PROJECT DEVICE ARCH=aarch64
-          DIRS=$(bash tools/list_deps.sh ${PACKAGE_LIST})
+          OUT=$(bash tools/list_deps.sh ${PACKAGE_LIST})
+          PKG_DIRS=$(echo "$OUT" | sed -n '1,/---WATCH---/p' | grep -v '^---WATCH---$')
+          WATCH_PATHS=$(echo "$OUT" | sed -n '/---WATCH---/,$p' | grep -v '^---WATCH---$')
 
-          HASH=$(for d in $DIRS; do
-            find "$d" -type f \( -name 'package.mk' -o -name '*.patch' -o -name '*.conf' \)
-          done | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+          HASH=$({
+            for d in $PKG_DIRS; do
+              find "$d" -type f \( -name 'package.mk' -o -name '*.patch' -o -name '*.conf' \)
+            done
+            for d in $WATCH_PATHS; do
+              find "$d" -type f
+            done
+          } | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
 
           echo "hash=$HASH" >> "$GITHUB_OUTPUT"
-          echo "Resolved $(echo "$DIRS" | wc -l) package dirs into hash $HASH"
 
       # Try to restore the whole toolchain/build tree from a previous run first.
       # On a hit, Build and everything that only makes sense post-build is skipped.
