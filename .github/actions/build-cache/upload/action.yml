@@ -1,7 +1,7 @@
 name: Upload build tree to cache
-description: Publishes a tar.zst + sha256 sidecar as release assets in the cache repo.
+description: Publishes tar.zst parts + sha256 manifest as release assets in the cache repo.
 inputs:
-  tar-path:
+  tar-glob:
     required: true
   checksum-path:
     required: true
@@ -20,7 +20,7 @@ runs:
       with:
         tag_name: ${{ inputs.tag-name }}
         files: |
-          ${{ inputs.tar-path }}
+          ${{ inputs.tar-glob }}
           ${{ inputs.checksum-path }}
         make_latest: true
         prerelease: true

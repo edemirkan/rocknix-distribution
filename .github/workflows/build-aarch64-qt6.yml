@@ -164,7 +164,7 @@ jobs:
         if: steps.restore-qt6.outputs.hit != 'true'
         uses: ./.github/actions/build-cache/upload
         with:
-          tar-path: ${{ steps.tar-checksum.outputs.tar-path }}
+          tar-glob: ${{ steps.tar-checksum.outputs.tar-glob }}
           checksum-path: ${{ steps.tar-checksum.outputs.checksum-path }}
           tag-name: qt6
           cache-repo: ${{ env.CACHE_REPO }}

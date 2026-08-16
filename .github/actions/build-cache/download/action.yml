@@ -1,25 +1,20 @@
 name: Restore build tree from cache
 description: >
-  Attempts to download a hash-keyed build-tree tarball (and its sha256 sidecar)
-  from a release in the given cache repo; verifies the checksum and extracts on
-  success. Sets 'hit=true' only if the download and checksum both succeeded.
+  Downloads all hash-keyed tar.zst parts (and their combined sha256 manifest)
+  for a given cache entry, verifies checksums, reassembles, and extracts.
 inputs:
   hash:
     required: true
   device:
     required: true
   artifact-prefix:
-    description: Filename prefix, e.g. "toolchain-aarch64"
     required: true
   tag-name:
-    description: Release tag in the cache repo this artifact is stored under
     required: true
   cache-repo:
-    description: "owner/repo of the cache repository"
     required: true
 outputs:
   hit:
-    description: "'true' if a matching cache entry was found, verified, and extracted"
     value: ${{ steps.restore.outputs.hit }}
 runs:
   using: composite
@@ -28,19 +23,33 @@ runs:
       shell: bash
       run: |
         BASE="${{ inputs.artifact-prefix }}-${{ inputs.device }}-${{ inputs.hash }}"
-        URL="https://github.com/${{ inputs.cache-repo }}/releases/download/${{ inputs.tag-name }}/${BASE}.tar.zst"
-        SUMURL="${URL}.sha256"
 
-        if curl -L --fail --silent -o "${BASE}.tar.zst" "$URL" && curl -L --fail --silent -o "${BASE}.tar.zst.sha256" "$SUMURL"; then
-          if sha256sum -c "${BASE}.tar.zst.sha256"; then
-            tar --zstd -xf "${BASE}.tar.zst"
-            echo "hit=true" >> "$GITHUB_OUTPUT"
-            echo "Restored cache for hash ${{ inputs.hash }} — skipping build"
-          else
-            echo "::warning::Checksum mismatch on ${BASE}.tar.zst, discarding"
-            echo "hit=false" >> "$GITHUB_OUTPUT"
-          fi
-        else
+        ASSETS_JSON=$(curl -s "https://api.github.com/repos/${{ inputs.cache-repo }}/releases/tags/${{ inputs.tag-name }}")
+        mapfile -t URLS < <(echo "$ASSETS_JSON" | jq -r --arg base "$BASE" '.assets[]? | select(.name | startswith($base)) | .browser_download_url')
+
+        if [ "${#URLS[@]}" -eq 0 ]; then
           echo "No exact-match cache for ${{ inputs.hash }}"
+          echo "hit=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        for url in "${URLS[@]}"; do
+          curl -L --fail --silent -o "$(basename "$url")" "$url"
+        done
+
+        if [ ! -f "${BASE}.sha256" ]; then
+          echo "::warning::Manifest missing for $BASE, discarding"
+          rm -f "${BASE}.tar.zst.part."*
+          echo "hit=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        if sha256sum -c "${BASE}.sha256"; then
+          cat $(ls "${BASE}.tar.zst.part."* | sort) | sudo tar --zstd -xf -
+          echo "hit=true" >> "$GITHUB_OUTPUT"
+          echo "Restored cache for hash ${{ inputs.hash }} — skipping build"
+        else
+          echo "::warning::Checksum mismatch on parts for $BASE, discarding"
+          rm -f "${BASE}.tar.zst.part."* "${BASE}.sha256"
           echo "hit=false" >> "$GITHUB_OUTPUT"
         fi

@@ -169,7 +169,7 @@ jobs:
         if: steps.restore-toolchain.outputs.hit != 'true'
         uses: ./.github/actions/build-cache/upload
         with:
-          tar-path: ${{ steps.tar-checksum.outputs.tar-path }}
+          tar-glob: ${{ steps.tar-checksum.outputs.tar-glob }}
           checksum-path: ${{ steps.tar-checksum.outputs.checksum-path }}
           tag-name: toolchain
           cache-repo: ${{ env.CACHE_REPO }}
