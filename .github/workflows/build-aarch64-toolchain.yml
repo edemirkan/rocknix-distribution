@@ -203,15 +203,20 @@ jobs:
 
       # Unconditional — runs whether we hit cache or built fresh, so downstream
       # jobs in THIS workflow run always have something to download.
+      - name: Tar toolchain artifact for same-run consumers
+        if: always()
+        run: |
+          tar --zstd -cf build.aarch64-toolchain.tar.zst \
+            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain \
+            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/build \
+            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/install_* \
+            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.stamps
+
       - name: Upload toolchain artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: aarch64-toolchain (${{ inputs.DEVICE }})
-          path: |
-            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain
-            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/build
-            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/install_*
-            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.stamps
+          path: build.aarch64-toolchain.tar.zst
           compression-level: 0
           if-no-files-found: error
