@@ -13,6 +13,10 @@ inputs:
   paths:
     description: Newline-separated list of paths/globs to include in the tarball
     required: true
+  exclude:
+    description: Newline-separated tar --exclude patterns (optional)
+    required: false
+    default: ""
 outputs:
   tar-path:
     value: ${{ steps.tar.outputs.tar-path }}
@@ -31,8 +35,13 @@ runs:
           [ -n "$line" ] && PATHS+=("$line")
         done <<< "${{ inputs.paths }}"
 
+        EXCLUDES=()
+        while IFS= read -r pattern; do
+          [ -n "$pattern" ] && EXCLUDES+=("--exclude=$pattern")
+        done <<< "${{ inputs.exclude }}"
+
         # intentionally unquoted expansion so glob entries like install_* still expand
-        tar --zstd -cf "${BASE}.tar.zst" ${PATHS[@]}
+        tar --zstd "${EXCLUDES[@]}" -cf "${BASE}.tar.zst" ${PATHS[@]}
         sha256sum "${BASE}.tar.zst" > "${BASE}.tar.zst.sha256"
 
         echo "tar-path=${BASE}.tar.zst" >> "$GITHUB_OUTPUT"
