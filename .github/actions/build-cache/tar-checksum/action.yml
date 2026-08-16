@@ -1,0 +1,39 @@
+name: Tar and checksum a build tree
+description: >
+  Compresses the given paths into a hash-named tar.zst and writes a sha256
+  sidecar next to it. Glob patterns in 'paths' (e.g. install_*) are expanded.
+inputs:
+  hash:
+    required: true
+  device:
+    required: true
+  artifact-prefix:
+    description: Filename prefix, e.g. "toolchain-aarch64"
+    required: true
+  paths:
+    description: Newline-separated list of paths/globs to include in the tarball
+    required: true
+outputs:
+  tar-path:
+    value: ${{ steps.tar.outputs.tar-path }}
+  checksum-path:
+    value: ${{ steps.tar.outputs.checksum-path }}
+runs:
+  using: composite
+  steps:
+    - id: tar
+      shell: bash
+      run: |
+        BASE="${{ inputs.artifact-prefix }}-${{ inputs.device }}-${{ inputs.hash }}"
+
+        PATHS=()
+        while IFS= read -r line; do
+          [ -n "$line" ] && PATHS+=("$line")
+        done <<< "${{ inputs.paths }}"
+
+        # intentionally unquoted expansion so glob entries like install_* still expand
+        tar --zstd -cf "${BASE}.tar.zst" ${PATHS[@]}
+        sha256sum "${BASE}.tar.zst" > "${BASE}.tar.zst.sha256"
+
+        echo "tar-path=${BASE}.tar.zst" >> "$GITHUB_OUTPUT"
+        echo "checksum-path=${BASE}.tar.zst.sha256" >> "$GITHUB_OUTPUT"

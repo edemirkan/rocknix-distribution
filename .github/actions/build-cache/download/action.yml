@@ -1,0 +1,46 @@
+name: Restore build tree from cache
+description: >
+  Attempts to download a hash-keyed build-tree tarball (and its sha256 sidecar)
+  from a release in the given cache repo; verifies the checksum and extracts on
+  success. Sets 'hit=true' only if the download and checksum both succeeded.
+inputs:
+  hash:
+    required: true
+  device:
+    required: true
+  artifact-prefix:
+    description: Filename prefix, e.g. "toolchain-aarch64"
+    required: true
+  tag-name:
+    description: Release tag in the cache repo this artifact is stored under
+    required: true
+  cache-repo:
+    description: "owner/repo of the cache repository"
+    required: true
+outputs:
+  hit:
+    description: "'true' if a matching cache entry was found, verified, and extracted"
+    value: ${{ steps.restore.outputs.hit }}
+runs:
+  using: composite
+  steps:
+    - id: restore
+      shell: bash
+      run: |
+        BASE="${{ inputs.artifact-prefix }}-${{ inputs.device }}-${{ inputs.hash }}"
+        URL="https://github.com/${{ inputs.cache-repo }}/releases/download/${{ inputs.tag-name }}/${BASE}.tar.zst"
+        SUMURL="${URL}.sha256"
+
+        if curl -L --fail --silent -o "${BASE}.tar.zst" "$URL" && curl -L --fail --silent -o "${BASE}.tar.zst.sha256" "$SUMURL"; then
+          if sha256sum -c "${BASE}.tar.zst.sha256"; then
+            tar --zstd -xf "${BASE}.tar.zst"
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+            echo "Restored cache for hash ${{ inputs.hash }} — skipping build"
+          else
+            echo "::warning::Checksum mismatch on ${BASE}.tar.zst, discarding"
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+        else
+          echo "No exact-match cache for ${{ inputs.hash }}"
+          echo "hit=false" >> "$GITHUB_OUTPUT"
+        fi

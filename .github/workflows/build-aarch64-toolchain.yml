@@ -36,6 +36,7 @@ jobs:
       CCACHE_COMPRESSLEVEL: 6
       CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
       PACKAGE_LIST: "toolchain alsa-lib llvm:host"
+      CACHE_REPO: ${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}
     outputs:
       cache-hit: ${{ steps.restore-toolchain.outputs.hit }}
     steps:
@@ -43,50 +44,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Compute a hash of all the package.mk, *.patch, and *.conf files in the toolchain dependency tree. 
-      # This is used to determine whether we can restore a previous build from cache.
       - name: Compute toolchain dependency hash
         id: hash
-        run: |
-          export PROJECT DEVICE ARCH=aarch64
-          OUT=$(bash tools/list_deps.sh ${PACKAGE_LIST})
-          PKG_DIRS=$(echo "$OUT" | sed -n '1,/---WATCH---/p' | grep -v '^---WATCH---$')
-          WATCH_PATHS=$(echo "$OUT" | sed -n '/---WATCH---/,$p' | grep -v '^---WATCH---$')
-
-          HASH=$({
-            for d in $PKG_DIRS; do
-              find "$d" -type f \( -name 'package.mk' -o -name '*.patch' -o -name '*.conf' \)
-            done
-            for d in $WATCH_PATHS; do
-              find "$d" -type f
-            done
-          } | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
-
-          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/build-cache/compute-hash
+        with:
+          project: ${{ env.PROJECT }}
+          device: ${{ env.DEVICE }}
+          arch: ${{ env.ARCH }}
+          package-list: ${{ env.PACKAGE_LIST }}
 
       # Try to restore the whole toolchain/build tree from a previous run first.
       # On a hit, Build and everything that only makes sense post-build is skipped.
       - name: Retrieve toolchain build tree
         id: restore-toolchain
-        run: |
-          HASH=${{ steps.hash.outputs.hash }}
-          BASE="toolchain-aarch64-${{ inputs.DEVICE }}-${HASH}"
-          URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/toolchain/${BASE}.tar.zst"
-          SUMURL="${URL}.sha256"
-
-          if curl -L --fail --silent -o "${BASE}.tar.zst" "$URL" && curl -L --fail --silent -o "${BASE}.tar.zst.sha256" "$SUMURL"; then
-            if sha256sum -c "${BASE}.tar.zst.sha256"; then
-              tar --zstd -xf "${BASE}.tar.zst"
-              echo "hit=true" >> "$GITHUB_OUTPUT"
-              echo "Restored full toolchain tree for hash $HASH — skipping build"
-            else
-              echo "::warning::Checksum mismatch on toolchain tree, discarding"
-              echo "hit=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "No exact-match toolchain tree for $HASH"
-            echo "hit=false" >> "$GITHUB_OUTPUT"
-          fi
+        uses: ./.github/actions/build-cache/download
+        with:
+          hash: ${{ steps.hash.outputs.hash }}
+          device: ${{ env.DEVICE }}
+          artifact-prefix: toolchain-aarch64
+          tag-name: toolchain
+          cache-repo: ${{ env.CACHE_REPO }}
 
       - name: Maximize build space
         if: steps.restore-toolchain.outputs.hit != 'true'
@@ -97,7 +74,7 @@ jobs:
       - name: Retrieve ccache
         if: steps.restore-toolchain.outputs.hit != 'true'
         run: |
-          URL="https://github.com/${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}/releases/download/ccache/ccache-aarch64-${{ inputs.DEVICE }}-toolchain.tar"
+          URL="https://github.com/${{ env.CACHE_REPO }}/releases/download/ccache/ccache-aarch64-${{ inputs.DEVICE }}-toolchain.tar"
           curl -L --fail --silent --show-error "$URL" | tar -xvf - || echo "Cache archive not found, skipping."
 
       - name: Build
@@ -171,35 +148,32 @@ jobs:
           prerelease: true
           body: ccache
           token: ${{ secrets.GH_PAT }}
-          repository: ${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}
+          repository: ${{ env.CACHE_REPO }}
         continue-on-error: true
 
       - name: Tar and checksum toolchain build tree
+        id: tar-checksum
         if: steps.restore-toolchain.outputs.hit != 'true'
-        run: |
-          HASH=${{ steps.hash.outputs.hash }}
-          BASE="toolchain-aarch64-${{ inputs.DEVICE }}-${HASH}"
-          tar --zstd -cf "${BASE}.tar.zst" \
-            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain \
-            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/build \
-            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/install_* \
+        uses: ./.github/actions/build-cache/tar-checksum
+        with:
+          hash: ${{ steps.hash.outputs.hash }}
+          device: ${{ env.DEVICE }}
+          artifact-prefix: toolchain-aarch64
+          paths: |
+            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/toolchain
+            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/build
+            ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/install_*
             ./build.ROCKNIX-${{ inputs.DEVICE }}.aarch64/.stamps
-          sha256sum "${BASE}.tar.zst" > "${BASE}.tar.zst.sha256"
 
       - name: Save toolchain build tree
         if: steps.restore-toolchain.outputs.hit != 'true'
-        uses: softprops/action-gh-release@v3
+        uses: ./.github/actions/build-cache/upload
         with:
-          tag_name: toolchain
-          files: |
-            toolchain-aarch64-${{ inputs.DEVICE }}-${{ steps.hash.outputs.hash }}.tar.zst
-            toolchain-aarch64-${{ inputs.DEVICE }}-${{ steps.hash.outputs.hash }}.tar.zst.sha256
-          make_latest: true
-          prerelease: true
-          body: toolchain
+          tar-path: ${{ steps.tar-checksum.outputs.tar-path }}
+          checksum-path: ${{ steps.tar-checksum.outputs.checksum-path }}
+          tag-name: toolchain
+          cache-repo: ${{ env.CACHE_REPO }}
           token: ${{ secrets.GH_PAT }}
-          repository: ${{ github.repository_owner }}/${{ vars.CACHE_REPO || 'distribution-cache' }}
-        continue-on-error: true
 
       # Unconditional — runs whether we hit cache or built fresh, so downstream
       # jobs in THIS workflow run always have something to download.
